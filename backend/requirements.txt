@@ -6,20 +6,16 @@ pydantic-settings>=2.1.0
 
 # Database & ORM
 sqlalchemy>=2.0.25
-asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
 alembic>=1.13.1
 
-# Vector DB & Cache
+# Vector DB, Cache & Background Jobs
 qdrant-client>=1.7.3
 redis>=5.0.1
 celery>=5.3.6
 
-# AI / ML / RAG Libraries
+# AI / RAG (API-based, no heavy local ML deps)
 openai>=1.12.0
-anthropic>=0.17.0
-sentence-transformers>=2.3.1
-torch>=2.1.2
 tiktoken>=0.6.0
 rank-bm25>=0.2.2
 
