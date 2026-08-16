@@ -11,6 +11,25 @@ class ChatQueryRequest(BaseModel):
     academic_term: Optional[str] = None
 
 
+class Citation(BaseModel):
+    index: int
+    document_id: uuid.UUID
+    document_title: str
+    chunk_id: uuid.UUID
+    page_number: Optional[int] = None
+    section_title: Optional[str] = None
+    score: float
+    snippet: str
+
+
+class ChatQueryResponse(BaseModel):
+    conversation_id: uuid.UUID
+    message_id: uuid.UUID
+    answer: str
+    citations: List[Citation] = []
+    meta: Dict[str, Any] = {}
+
+
 class MessageRead(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
