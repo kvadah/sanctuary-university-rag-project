@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, ConfigDict
 from app.models.knowledge import KnowledgeSourceType, DocumentClassification, SyncStatus
+from app.schemas.common import PaginationMeta
 
 
 class KnowledgeSourceCreate(BaseModel):
@@ -10,6 +11,13 @@ class KnowledgeSourceCreate(BaseModel):
     description: Optional[str] = None
     source_type: KnowledgeSourceType
     config: Optional[Dict[str, Any]] = None
+
+
+class KnowledgeSourceUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    is_active: Optional[bool] = None
 
 
 class KnowledgeSourceRead(BaseModel):
@@ -25,6 +33,11 @@ class KnowledgeSourceRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class KnowledgeSourceListResponse(BaseModel):
+    items: List[KnowledgeSourceRead]
+    pagination: PaginationMeta
 
 
 class DocumentRead(BaseModel):
