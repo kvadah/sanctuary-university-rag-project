@@ -67,8 +67,15 @@ class Settings(BaseSettings):
     # AI Model Providers
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-    DEFAULT_EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    DEFAULT_EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI, 1536-dim
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+
+    # RAG pipeline
+    EMBEDDING_DIM: int = 1536  # must match DEFAULT_EMBEDDING_MODEL's output size
+    QDRANT_COLLECTION: str = "document_chunks"
+    CHUNK_MAX_TOKENS: int = 500
+    CHUNK_OVERLAP_TOKENS: int = 75
+    RAG_TOP_K: int = 5
 
     model_config = SettingsConfigDict(
         env_file=".env",

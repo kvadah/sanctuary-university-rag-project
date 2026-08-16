@@ -66,3 +66,13 @@ class DocumentChunkRead(BaseModel):
     vector_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentIngestResponse(BaseModel):
+    document: DocumentRead
+    chunk_count: int
+
+
+class DocumentListResponse(BaseModel):
+    items: List[DocumentRead]
+    pagination: PaginationMeta

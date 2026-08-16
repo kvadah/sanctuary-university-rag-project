@@ -2,7 +2,7 @@ import uuid
 from typing import Optional, List, Tuple
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.knowledge import KnowledgeSource
+from app.models.knowledge import KnowledgeSource, KnowledgeSourceType
 from app.schemas.knowledge import KnowledgeSourceCreate, KnowledgeSourceUpdate
 
 
@@ -54,3 +54,30 @@ class KnowledgeSourceRepository:
         """Remove a source (cascades to its documents)."""
         await self.db.delete(source)
         await self.db.flush()
+
+    async def get_or_create_upload_source(
+        self, source_type: KnowledgeSourceType
+    ) -> KnowledgeSource:
+        """Return a shared KnowledgeSource for uploaded files of ``source_type``.
+
+        Uploaded documents are grouped under one auto-created source per type,
+        so ad-hoc uploads still satisfy the Document -> KnowledgeSource FK.
+        """
+        name = f"Uploaded {source_type.value} Documents"
+        result = await self.db.execute(
+            select(KnowledgeSource).where(KnowledgeSource.name == name)
+        )
+        source = result.scalar_one_or_none()
+        if source:
+            return source
+
+        source = KnowledgeSource(
+            name=name,
+            description="Auto-created container for uploaded documents.",
+            source_type=source_type,
+            is_active=True,
+        )
+        self.db.add(source)
+        await self.db.flush()
+        await self.db.refresh(source)
+        return source
