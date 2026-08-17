@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, ConfigDict
 from app.models.chat import MessageRole
+from app.schemas.common import PaginationMeta
 
 
 class ChatQueryRequest(BaseModel):
@@ -45,6 +46,15 @@ class ConversationCreate(BaseModel):
     title: Optional[str] = "New Conversation"
 
 
+class ConversationSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ConversationRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -54,6 +64,11 @@ class ConversationRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationListResponse(BaseModel):
+    items: List[ConversationSummary]
+    pagination: PaginationMeta
 
 
 class FeedbackCreate(BaseModel):
