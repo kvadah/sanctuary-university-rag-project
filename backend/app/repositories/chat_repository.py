@@ -106,6 +106,20 @@ class MessageRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_recent(
+        self, conversation_id: uuid.UUID, limit: int
+    ) -> List[Message]:
+        """Return up to ``limit`` most recent messages, in chronological order."""
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        messages = list(result.scalars().all())
+        messages.reverse()  # oldest-first for prompt construction
+        return messages
+
 
 class FeedbackRepository:
     def __init__(self, db: AsyncSession):

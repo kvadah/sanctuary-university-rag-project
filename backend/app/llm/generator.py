@@ -1,11 +1,12 @@
 """Grounded answer generation over retrieved context.
 
 Builds a citation-friendly prompt from numbered context blocks and calls the
-OpenAI chat-completions endpoint. The model is instructed to answer only from the
-provided context and to cite sources as ``[n]``; if the context is empty we
-short-circuit with a canned refusal and skip the API call.
+OpenAI chat-completions endpoint. Recent conversation turns are threaded in as
+prior messages so follow-ups stay coherent. The model is instructed to answer
+only from the provided context and to cite sources as ``[n]``; if the context is
+empty we short-circuit with a canned refusal and skip the API call.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.llm.client import get_openai_client
@@ -16,7 +17,8 @@ _SYSTEM_PROMPT = (
     "Cite the passages you use inline with their bracketed number, e.g. [1] or [2]. "
     "If the answer is not contained in the context, say you don't have that "
     "information in the available documents. Do not invent facts or cite passages "
-    "that were not provided."
+    "that were not provided. Prior conversation turns are for context only — never "
+    "cite them; cite only the numbered passages."
 )
 
 _NO_CONTEXT_ANSWER = (
@@ -30,22 +32,32 @@ class AnswerGenerator:
         self.model = model or settings.DEFAULT_LLM_MODEL
 
     async def generate(
-        self, query: str, context_chunks: List[Dict[str, Any]]
+        self,
+        query: str,
+        context_chunks: List[Dict[str, Any]],
+        history: Optional[List[Tuple[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """Generate an answer. ``context_chunks`` items carry index/title/page/content."""
+        """Generate an answer. ``context_chunks`` items carry index/title/page/content.
+
+        ``history`` is an ordered list of ``(role, content)`` prior turns inserted
+        between the system prompt and the current question for multi-turn memory.
+        """
         if not context_chunks:
             return {"answer": _NO_CONTEXT_ANSWER, "usage": {}}
 
         context = "\n\n".join(_format_block(c) for c in context_chunks)
         user_message = f"Context:\n{context}\n\nQuestion: {query}"
 
+        messages: List[Dict[str, str]] = [{"role": "system", "content": _SYSTEM_PROMPT}]
+        for role, content in history or []:
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": user_message})
+
         response = await self._client.chat.completions.create(
             model=self.model,
             temperature=0.1,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
+            messages=messages,
         )
         usage = response.usage
         return {

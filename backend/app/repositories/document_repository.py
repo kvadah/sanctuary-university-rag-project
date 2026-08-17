@@ -69,3 +69,36 @@ class DocumentChunkRepository:
         self.db.add_all(chunks)
         await self.db.flush()
         return chunks
+
+    async def count_current(self) -> int:
+        """Count chunks belonging to current documents (the BM25 cache token)."""
+        total = await self.db.scalar(
+            select(func.count())
+            .select_from(DocumentChunk)
+            .join(Document, DocumentChunk.document_id == Document.id)
+            .where(Document.is_current.is_(True))
+        )
+        return int(total or 0)
+
+    async def list_current_for_index(self):
+        """Fetch current chunks joined to their document, for the lexical index.
+
+        Classification / academic_term / title live on ``Document``, so the BM25
+        index needs this join to apply the same RBAC and term filters as the
+        dense retriever. Returns lightweight rows (not full ORM objects).
+        """
+        result = await self.db.execute(
+            select(
+                DocumentChunk.id.label("chunk_id"),
+                DocumentChunk.content,
+                DocumentChunk.page_number,
+                DocumentChunk.section_title,
+                Document.id.label("document_id"),
+                Document.title.label("document_title"),
+                Document.classification,
+                Document.academic_term,
+            )
+            .join(Document, DocumentChunk.document_id == Document.id)
+            .where(Document.is_current.is_(True))
+        )
+        return result.all()
