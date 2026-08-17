@@ -75,7 +75,13 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "document_chunks"
     CHUNK_MAX_TOKENS: int = 500
     CHUNK_OVERLAP_TOKENS: int = 75
-    RAG_TOP_K: int = 5
+    RAG_TOP_K: int = 5  # final chunks handed to the generator
+    # Hybrid retrieval + memory (see app/retrieval/)
+    RAG_CANDIDATE_K: int = 20  # candidates each retriever returns before fusion/rerank
+    RAG_RRF_K: int = 60  # Reciprocal Rank Fusion damping constant
+    RAG_HISTORY_TURNS: int = 6  # recent messages fed to retrieval + generation
+    RAG_RERANK_ENABLED: bool = True  # LLM rerank of fused candidates
+    RAG_QUERY_REWRITE_ENABLED: bool = True  # LLM rewrite of follow-ups before retrieval
 
     model_config = SettingsConfigDict(
         env_file=".env",
