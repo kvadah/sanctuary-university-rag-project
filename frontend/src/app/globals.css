@@ -2,19 +2,82 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 15, 23, 42;
-  --background-start-rgb: 248, 250, 252;
-  --background-end-rgb: 255, 255, 255;
+@layer base {
+  :root {
+    --background: 248 250 252; /* slate-50 */
+    --foreground: 15 23 42; /* slate-900 */
+    --card: 255 255 255; /* white */
+    --card-foreground: 15 23 42;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
+    --muted: 241 245 249; /* slate-100 */
+    --muted-foreground: 100 116 139; /* slate-500 */
+    --border: 226 232 240; /* slate-200 */
+    --input: 226 232 240; /* slate-200 */
+    --ring: 2 132 199; /* sky-600 */
+    --primary: 2 132 199; /* sky-600 */
+    --primary-foreground: 255 255 255;
+    --accent: 224 239 254; /* sky-100 */
+    --accent-foreground: 3 78 162; /* brand-700 */
+    --destructive: 220 38 38; /* red-600 */
+    --destructive-foreground: 255 255 255;
+  }
+
+  .dark {
+    --background: 2 6 23; /* slate-950 */
+    --foreground: 226 232 240; /* slate-200 */
+    --card: 15 23 42; /* slate-900 */
+    --card-foreground: 226 232 240;
+    --popover: 15 23 42;
+    --popover-foreground: 226 232 240;
+    --muted: 30 41 59; /* slate-800 */
+    --muted-foreground: 148 163 184; /* slate-400 */
+    --border: 30 41 59; /* slate-800 */
+    --input: 51 65 85; /* slate-700 */
+    --ring: 56 189 248; /* sky-400 */
+    --primary: 56 189 248; /* sky-400 */
+    --primary-foreground: 2 6 23;
+    --accent: 12 74 110; /* sky-900 */
+    --accent-foreground: 186 230 253; /* sky-200 */
+    --destructive: 248 113 113; /* red-400 */
+    --destructive-foreground: 2 6 23;
+  }
+
+  * {
+    border-color: rgb(var(--border));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  min-height: 100vh;
+@layer utilities {
+  /* Thin, theme-aware scrollbars */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--muted-foreground) / 0.35) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--muted-foreground) / 0.35);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--muted-foreground) / 0.55);
+  }
 }

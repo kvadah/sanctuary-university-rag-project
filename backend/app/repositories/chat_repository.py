@@ -1,11 +1,12 @@
-"""Repositories for chat conversations and messages (DB access only)."""
+"""Repositories for chat conversations, messages, and feedback (DB access only)."""
 import uuid
-from typing import Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models.chat import Conversation, Message, MessageRole
+from app.models.chat import Conversation, Feedback, Message, MessageRole
 
 
 class ConversationRepository:
@@ -27,6 +28,38 @@ class ConversationRepository:
         """Fetch a conversation only if it belongs to ``user_id``."""
         result = await self.db.execute(
             select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def list_by_user(
+        self, user_id: uuid.UUID, skip: int, limit: int
+    ) -> Tuple[List[Conversation], int]:
+        """Return a page of the user's conversations, most recently updated first."""
+        total = await self.db.scalar(
+            select(func.count())
+            .select_from(Conversation)
+            .where(Conversation.user_id == user_id)
+        )
+        result = await self.db.execute(
+            select(Conversation)
+            .where(Conversation.user_id == user_id)
+            .order_by(Conversation.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all()), int(total or 0)
+
+    async def get_with_messages(
+        self, conversation_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Optional[Conversation]:
+        """Fetch an owned conversation with its messages eagerly loaded."""
+        result = await self.db.execute(
+            select(Conversation)
+            .options(selectinload(Conversation.messages))
+            .where(
                 Conversation.id == conversation_id,
                 Conversation.user_id == user_id,
             )
@@ -58,3 +91,53 @@ class MessageRepository:
         await self.db.flush()
         await self.db.refresh(message)
         return message
+
+    async def get_owned(
+        self, message_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Optional[Message]:
+        """Fetch a message only if its conversation belongs to ``user_id``."""
+        result = await self.db.execute(
+            select(Message)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+            .where(
+                Message.id == message_id,
+                Conversation.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+
+class FeedbackRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def upsert(
+        self,
+        *,
+        message_id: uuid.UUID,
+        user_id: uuid.UUID,
+        rating: int,
+        comment: Optional[str] = None,
+    ) -> Feedback:
+        """Create feedback for (message, user), or update it if it already exists."""
+        result = await self.db.execute(
+            select(Feedback).where(
+                Feedback.message_id == message_id,
+                Feedback.user_id == user_id,
+            )
+        )
+        feedback = result.scalar_one_or_none()
+        if feedback is None:
+            feedback = Feedback(
+                message_id=message_id,
+                user_id=user_id,
+                rating=rating,
+                comment=comment,
+            )
+            self.db.add(feedback)
+        else:
+            feedback.rating = rating
+            feedback.comment = comment
+        await self.db.flush()
+        await self.db.refresh(feedback)
+        return feedback
