@@ -15,11 +15,12 @@ class UserBase(BaseModel):
 
 
 class UserCreate(BaseModel):
+    # Role is intentionally NOT accepted at registration: every new account is a
+    # STUDENT. Elevating a role is a database-administrator action.
     email: EmailStr
     password: str
     first_name: str
     last_name: str
-    role: UserRole = UserRole.STUDENT
     department: Optional[str] = None
 
 
