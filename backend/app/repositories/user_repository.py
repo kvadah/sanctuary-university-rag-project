@@ -27,7 +27,7 @@ class UserRepository:
             password_hash=password_hash,
             first_name=user_in.first_name,
             last_name=user_in.last_name,
-            role=user_in.role,
+            role=UserRole.STUDENT,  # role is fixed at registration; only a DB admin can change it
             department=user_in.department,
             is_active=True,
         )

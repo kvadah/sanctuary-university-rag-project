@@ -6,12 +6,9 @@ import { AuthCard } from '@/components/auth/auth-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select } from '@/components/ui/select';
 import { useRegister } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { ROLE_OPTIONS } from '@/lib/constants';
-import { UserRole } from '@/lib/types';
-import { extractError, roleLabel } from '@/lib/utils';
+import { extractError } from '@/lib/utils';
 
 export default function RegisterPage() {
   const register = useRegister();
@@ -21,7 +18,6 @@ export default function RegisterPage() {
     last_name: '',
     email: '',
     password: '',
-    role: UserRole.STUDENT,
     department: '',
   });
 
@@ -36,7 +32,6 @@ export default function RegisterPage() {
         last_name: form.last_name,
         email: form.email,
         password: form.password,
-        role: form.role,
         department: form.department || null,
       },
       {
@@ -116,30 +111,14 @@ export default function RegisterPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="role">Role</Label>
-            <Select
-              id="role"
-              value={form.role}
-              onChange={(e) => set('role', e.target.value as UserRole)}
-            >
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="department">Department</Label>
-            <Input
-              id="department"
-              placeholder="Optional"
-              value={form.department}
-              onChange={(e) => set('department', e.target.value)}
-            />
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="department">Department</Label>
+          <Input
+            id="department"
+            placeholder="Optional"
+            value={form.department}
+            onChange={(e) => set('department', e.target.value)}
+          />
         </div>
 
         <Button

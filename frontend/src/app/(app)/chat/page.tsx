@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MessagesSquare } from 'lucide-react';
+import { MessagesSquare, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { ConversationSidebar } from '@/components/chat/conversation-sidebar';
 import { MessageList } from '@/components/chat/message-list';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useConversation } from '@/hooks/use-conversations';
 import { useSendMessage } from '@/hooks/use-chat';
 import { useToast } from '@/hooks/use-toast';
+import { usePersistentBoolean } from '@/hooks/use-persistent-boolean';
 import { ChatQueryResponse, Message, MessageRole } from '@/lib/types';
 import { extractError } from '@/lib/utils';
 
@@ -23,6 +24,11 @@ export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [optimistic, setOptimistic] = useState<Optimistic | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Conversation history rail collapses on desktop; expanded by default.
+  const [historyCollapsed, setHistoryCollapsed] = usePersistentBoolean(
+    'chat-history-collapsed',
+    false,
+  );
 
   const conversation = useConversation(activeId);
   const send = useSendMessage();
@@ -117,14 +123,16 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full">
-      {/* Desktop conversation rail */}
-      <aside className="hidden w-72 shrink-0 border-r bg-card md:flex md:flex-col">
-        <ConversationSidebar
-          activeId={activeId}
-          onSelect={handleSelect}
-          onNew={handleNew}
-        />
-      </aside>
+      {/* Desktop conversation rail — hidden while collapsed */}
+      {!historyCollapsed && (
+        <aside className="hidden w-72 shrink-0 border-r bg-card md:flex md:flex-col">
+          <ConversationSidebar
+            activeId={activeId}
+            onSelect={handleSelect}
+            onNew={handleNew}
+          />
+        </aside>
+      )}
 
       {/* Mobile conversation drawer */}
       {drawerOpen && (
@@ -147,14 +155,32 @@ export default function ChatPage() {
 
       {/* Conversation column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b px-4 py-2 md:hidden">
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          {/* Mobile: open the conversation drawer */}
           <Button
             variant="outline"
             size="sm"
+            className="md:hidden"
             onClick={() => setDrawerOpen(true)}
           >
             <MessagesSquare className="h-4 w-4" />
             Conversations
+          </Button>
+
+          {/* Desktop: collapse/expand the conversation rail */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:inline-flex"
+            aria-pressed={!historyCollapsed}
+            onClick={() => setHistoryCollapsed((c) => !c)}
+          >
+            {historyCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+            {historyCollapsed ? 'Show conversations' : 'Hide conversations'}
           </Button>
         </div>
 
