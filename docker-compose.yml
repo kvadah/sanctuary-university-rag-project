@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: knowledgehub-backend
     restart: always
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:
@@ -48,6 +50,8 @@ services:
       dockerfile: Dockerfile
     container_name: knowledgehub-celery-worker
     command: celery -A app.workers.celery_app worker --loglevel=info
+    env_file:
+      - .env
     environment:
       - POSTGRES_SERVER=postgres
       - QDRANT_HOST=qdrant

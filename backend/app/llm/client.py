@@ -1,8 +1,11 @@
-"""Shared OpenAI async client factory.
+"""Shared LLM client factory (OpenAI-compatible).
 
-A single cached ``AsyncOpenAI`` instance is reused across requests. The key is
-read from ``settings.OPENAI_API_KEY``; a clear error is raised if it is missing
-so misconfiguration fails loudly rather than at the API boundary.
+Returns a single cached ``AsyncOpenAI`` instance, reused across requests. By
+default it is pointed at Google Gemini's OpenAI-compatible endpoint (free tier);
+set ``LLM_PROVIDER=openai`` in ``.env`` to use OpenAI proper instead. The active
+provider's key and base URL come from :mod:`app.core.config`; a clear error is
+raised if the key is missing so misconfiguration fails loudly rather than at the
+API boundary.
 """
 from functools import lru_cache
 
@@ -13,9 +16,13 @@ from app.core.config import settings
 
 @lru_cache(maxsize=1)
 def get_openai_client() -> AsyncOpenAI:
-    if not settings.OPENAI_API_KEY:
+    if not settings.LLM_API_KEY:
         raise RuntimeError(
-            "OPENAI_API_KEY is not configured. Set it in sanctuary-rag/.env to "
+            f"No LLM API key configured for LLM_PROVIDER='{settings.LLM_PROVIDER}'. "
+            "Set GEMINI_API_KEY (or OPENAI_API_KEY) in sanctuary-rag/.env to "
             "enable embeddings and answer generation."
         )
-    return AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    return AsyncOpenAI(
+        api_key=settings.LLM_API_KEY,
+        base_url=settings.LLM_BASE_URL or None,
+    )

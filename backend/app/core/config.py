@@ -65,13 +65,34 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
 
     # AI Model Providers
+    # The app talks to LLMs through the OpenAI SDK. LLM_PROVIDER selects which
+    # backend that SDK points at: "gemini" (Google AI Studio, free tier — the
+    # default) via its OpenAI-compatible endpoint, or "openai" for OpenAI proper.
+    LLM_PROVIDER: str = "gemini"
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
-    DEFAULT_EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI, 1536-dim
-    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+    # Gemini's OpenAI-compatible surface: https://ai.google.dev/gemini-api/docs/openai
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    DEFAULT_EMBEDDING_MODEL: str = "gemini-embedding-001"  # Gemini, 3072-dim (default)
+    DEFAULT_LLM_MODEL: str = "gemini-2.5-flash"
+
+    @property
+    def LLM_API_KEY(self) -> str:
+        """API key for the active provider (see LLM_PROVIDER)."""
+        if self.LLM_PROVIDER == "openai":
+            return self.OPENAI_API_KEY
+        return self.GEMINI_API_KEY
+
+    @property
+    def LLM_BASE_URL(self) -> str:
+        """Base URL for the active provider — empty means the SDK's OpenAI default."""
+        if self.LLM_PROVIDER == "openai":
+            return ""
+        return self.GEMINI_BASE_URL
 
     # RAG pipeline
-    EMBEDDING_DIM: int = 1536  # must match DEFAULT_EMBEDDING_MODEL's output size
+    EMBEDDING_DIM: int = 3072  # must match DEFAULT_EMBEDDING_MODEL's output size
     QDRANT_COLLECTION: str = "document_chunks"
     CHUNK_MAX_TOKENS: int = 500
     CHUNK_OVERLAP_TOKENS: int = 75
