@@ -21,10 +21,13 @@ class QdrantVectorStore:
         )
         self.collection = settings.QDRANT_COLLECTION
 
+    async def _collection_exists(self) -> bool:
+        existing = await self._client.get_collections()
+        return self.collection in {c.name for c in existing.collections}
+
     async def ensure_collection(self) -> None:
         """Create the collection if it does not already exist."""
-        existing = await self._client.get_collections()
-        if self.collection in {c.name for c in existing.collections}:
+        if await self._collection_exists():
             return
         await self._client.create_collection(
             collection_name=self.collection,
@@ -53,6 +56,13 @@ class QdrantVectorStore:
         academic_term: Optional[str] = None,
     ) -> List[qm.ScoredPoint]:
         """Return the top-k current chunks the caller is permitted to see."""
+        # On a fresh system the collection is not created until the first
+        # document is ingested. Treat a missing collection as "no matches" so a
+        # query against an empty knowledge base degrades to an empty result set
+        # instead of raising Qdrant's 404 — which, as an unhandled 500, would
+        # bypass CORSMiddleware and surface in the browser as a CORS error.
+        if not await self._collection_exists():
+            return []
         must: List[qm.Condition] = [
             qm.FieldCondition(
                 key="classification",
@@ -67,10 +77,14 @@ class QdrantVectorStore:
                 )
             )
 
-        return await self._client.search(
+        # qdrant-client >=1.10 removed ``.search()``; ``query_points`` is the
+        # replacement and returns a QueryResponse whose ``.points`` is the
+        # ``List[ScoredPoint]`` this method is documented to return.
+        response = await self._client.query_points(
             collection_name=self.collection,
-            query_vector=vector,
+            query=vector,
             query_filter=qm.Filter(must=must),
             limit=top_k,
             with_payload=True,
         )
+        return response.points
