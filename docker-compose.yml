@@ -78,7 +78,11 @@ services:
 
   # Qdrant Vector Search Engine
   qdrant:
-    image: qdrant/qdrant:v1.7.4
+    # Must be >=1.10 (and matched to the qdrant-client version in
+    # requirements.txt, currently 1.19.x): the client uses the Query API
+    # (POST /points/query), which older servers like 1.7.x do not expose and
+    # answer with 404 — surfacing as an unhandled 500 on every retrieval.
+    image: qdrant/qdrant:v1.19.0
     container_name: knowledgehub-qdrant
     restart: always
     ports:
