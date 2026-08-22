@@ -29,8 +29,13 @@ class EmbeddingClient:
             response = await self._client.embeddings.create(
                 model=self.model, input=batch
             )
-            ordered = sorted(response.data, key=lambda item: item.index)
-            vectors.extend(item.embedding for item in ordered)
+            # OpenAI populates `index` on each item; Gemini's OpenAI-compatible
+            # endpoint leaves it None. Sort by index only when present, otherwise
+            # trust the returned order (both providers return data in input order).
+            data = response.data
+            if all(item.index is not None for item in data):
+                data = sorted(data, key=lambda item: item.index)
+            vectors.extend(item.embedding for item in data)
         return vectors
 
     async def embed_query(self, text: str) -> List[float]:

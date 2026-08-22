@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # Gemini's OpenAI-compatible surface: https://ai.google.dev/gemini-api/docs/openai
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     DEFAULT_EMBEDDING_MODEL: str = "gemini-embedding-001"  # Gemini, 3072-dim (default)
-    DEFAULT_LLM_MODEL: str = "gemini-2.5-flash"
+    DEFAULT_LLM_MODEL: str = "gemini-3.6-flash"  # gemini-2.5-flash was retired for new users (404)
 
     @property
     def LLM_API_KEY(self) -> str:
