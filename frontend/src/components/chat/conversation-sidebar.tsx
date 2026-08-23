@@ -1,6 +1,6 @@
 'use client';
 
-import { MessageSquare, Plus } from 'lucide-react';
+import { MessageSquare, PanelLeftClose, Plus } from 'lucide-react';
 import { useConversations } from '@/hooks/use-conversations';
 import { cn, formatRelative } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,20 +10,40 @@ interface ConversationSidebarProps {
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  /** Collapse the conversation rail (desktop) or close the drawer (mobile). */
+  onCollapse?: () => void;
 }
 
 export function ConversationSidebar({
   activeId,
   onSelect,
   onNew,
+  onCollapse,
 }: ConversationSidebarProps) {
   const { data, isLoading } = useConversations();
   const items = data?.items ?? [];
 
   return (
     <div className="flex h-full flex-col">
-      <div className="p-3">
-        <Button className="w-full" onClick={onNew}>
+      <div className="space-y-2 p-3">
+        {onCollapse && (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={onCollapse}
+              aria-label="Hide conversations"
+              title="Hide conversations"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <Button
+          className="w-full gap-2 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-600/20 transition-all hover:from-brand-600 hover:to-brand-700 hover:shadow-md hover:shadow-brand-600/30 active:scale-[0.98]"
+          onClick={onNew}
+        >
           <Plus className="h-4 w-4" />
           New chat
         </Button>

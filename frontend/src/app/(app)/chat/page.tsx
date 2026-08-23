@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MessagesSquare, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { MessagesSquare, PanelLeftOpen } from 'lucide-react';
 import { ConversationSidebar } from '@/components/chat/conversation-sidebar';
 import { MessageList } from '@/components/chat/message-list';
 import { ChatComposer } from '@/components/chat/chat-composer';
@@ -12,6 +12,7 @@ import { useConversation } from '@/hooks/use-conversations';
 import { useChatStream } from '@/hooks/use-chat';
 import { useToast } from '@/hooks/use-toast';
 import { usePersistentBoolean } from '@/hooks/use-persistent-boolean';
+import { cn } from '@/lib/utils';
 
 export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -87,6 +88,7 @@ export default function ChatPage() {
             activeId={activeId}
             onSelect={handleSelect}
             onNew={handleNew}
+            onCollapse={() => setHistoryCollapsed(true)}
           />
         </aside>
       )}
@@ -105,6 +107,7 @@ export default function ChatPage() {
               activeId={activeId}
               onSelect={handleSelect}
               onNew={handleNew}
+              onCollapse={() => setDrawerOpen(false)}
             />
           </div>
         </div>
@@ -112,7 +115,15 @@ export default function ChatPage() {
 
       {/* Conversation column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div
+          className={cn(
+            'flex items-center gap-2 border-b px-4 py-2',
+            // Rail expanded on desktop: the collapse control lives in the
+            // sidebar, so this bar has nothing to show — hide it (still shown
+            // on mobile for the drawer trigger).
+            !historyCollapsed && 'md:hidden',
+          )}
+        >
           {/* Mobile: open the conversation drawer */}
           <Button
             variant="outline"
@@ -124,21 +135,18 @@ export default function ChatPage() {
             Conversations
           </Button>
 
-          {/* Desktop: collapse/expand the conversation rail */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:inline-flex"
-            aria-pressed={!historyCollapsed}
-            onClick={() => setHistoryCollapsed((c) => !c)}
-          >
-            {historyCollapsed ? (
+          {/* Desktop: re-open the conversation rail when collapsed */}
+          {historyCollapsed && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={() => setHistoryCollapsed(false)}
+            >
               <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-            {historyCollapsed ? 'Show conversations' : 'Hide conversations'}
-          </Button>
+              Show conversations
+            </Button>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
