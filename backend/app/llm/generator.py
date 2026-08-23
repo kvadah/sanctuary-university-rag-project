@@ -6,7 +6,7 @@ prior messages so follow-ups stay coherent. The model is instructed to answer
 only from the provided context and to cite sources as ``[n]``; if the context is
 empty we short-circuit with a canned refusal and skip the API call.
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.llm.client import get_openai_client
@@ -45,6 +45,64 @@ class AnswerGenerator:
         if not context_chunks:
             return {"answer": _NO_CONTEXT_ANSWER, "usage": {}}
 
+        messages = self._build_messages(query, context_chunks, history)
+        response = await self._client.chat.completions.create(
+            model=self.model,
+            temperature=0.1,
+            messages=messages,
+        )
+        return {
+            "answer": response.choices[0].message.content or "",
+            "usage": _usage_dict(response.usage),
+        }
+
+    async def generate_stream(
+        self,
+        query: str,
+        context_chunks: List[Dict[str, Any]],
+        history: Optional[List[Tuple[str, str]]] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Stream an answer as it is generated.
+
+        Yields ``{"delta": <text>}`` events as tokens arrive, followed by a final
+        ``{"usage": {...}}`` event. Mirrors :meth:`generate`: with no context we
+        short-circuit to the canned refusal and make no API call.
+        """
+        if not context_chunks:
+            yield {"delta": _NO_CONTEXT_ANSWER}
+            yield {"usage": {}}
+            return
+
+        messages = self._build_messages(query, context_chunks, history)
+        stream = await self._client.chat.completions.create(
+            model=self.model,
+            temperature=0.1,
+            messages=messages,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+
+        usage = None
+        async for chunk in stream:
+            # Usage rides along on chunks (incl. the final one); keep the latest.
+            if getattr(chunk, "usage", None):
+                usage = chunk.usage
+            if not chunk.choices:
+                continue
+            # Gemini emits content-less deltas (e.g. carrying thought signatures);
+            # skip anything without text.
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield {"delta": delta}
+
+        yield {"usage": _usage_dict(usage)}
+
+    def _build_messages(
+        self,
+        query: str,
+        context_chunks: List[Dict[str, Any]],
+        history: Optional[List[Tuple[str, str]]],
+    ) -> List[Dict[str, str]]:
         context = "\n\n".join(_format_block(c) for c in context_chunks)
         user_message = f"Context:\n{context}\n\nQuestion: {query}"
 
@@ -53,21 +111,16 @@ class AnswerGenerator:
             if role in ("user", "assistant") and content:
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": user_message})
+        return messages
 
-        response = await self._client.chat.completions.create(
-            model=self.model,
-            temperature=0.1,
-            messages=messages,
-        )
-        usage = response.usage
-        return {
-            "answer": response.choices[0].message.content or "",
-            "usage": {
-                "prompt_tokens": getattr(usage, "prompt_tokens", None),
-                "completion_tokens": getattr(usage, "completion_tokens", None),
-                "total_tokens": getattr(usage, "total_tokens", None),
-            },
-        }
+
+def _usage_dict(usage: Any) -> Dict[str, Any]:
+    """Normalize an OpenAI/Gemini usage object into a plain dict (Nones if absent)."""
+    return {
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+        "total_tokens": getattr(usage, "total_tokens", None),
+    }
 
 
 def _format_block(chunk: Dict[str, Any]) -> str:

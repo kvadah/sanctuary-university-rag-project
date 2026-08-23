@@ -54,23 +54,34 @@ function renderInline(text: string, citedIndexes: Set<number>): React.ReactNode[
 function RichText({
   content,
   citedIndexes,
+  streaming,
 }: {
   content: string;
   citedIndexes: Set<number>;
+  streaming?: boolean;
 }) {
   const paragraphs = content.split(/\n{2,}/);
   return (
     <>
-      {paragraphs.map((para, pi) => (
-        <p key={pi} className={cn(pi > 0 && 'mt-3')}>
-          {para.split('\n').map((line, li) => (
-            <Fragment key={li}>
-              {li > 0 && <br />}
-              {renderInline(line, citedIndexes)}
-            </Fragment>
-          ))}
-        </p>
-      ))}
+      {paragraphs.map((para, pi) => {
+        const isLast = pi === paragraphs.length - 1;
+        return (
+          <p key={pi} className={cn(pi > 0 && 'mt-3')}>
+            {para.split('\n').map((line, li) => (
+              <Fragment key={li}>
+                {li > 0 && <br />}
+                {renderInline(line, citedIndexes)}
+              </Fragment>
+            ))}
+            {isLast && streaming && (
+              <span
+                aria-hidden
+                className="ml-0.5 inline-block h-[0.9em] w-[2px] -translate-y-[1px] animate-pulse bg-current align-middle"
+              />
+            )}
+          </p>
+        );
+      })}
     </>
   );
 }
@@ -81,6 +92,8 @@ interface MessageBubbleProps {
   citations?: Citation[];
   messageId?: string;
   conversationId?: string | null;
+  /** When true, render a blinking caret and no feedback controls (live stream). */
+  streaming?: boolean;
 }
 
 export function MessageBubble({
@@ -89,6 +102,7 @@ export function MessageBubble({
   citations = [],
   messageId,
   conversationId,
+  streaming,
 }: MessageBubbleProps) {
   const isUser = role === MessageRole.USER;
 
@@ -111,7 +125,7 @@ export function MessageBubble({
       </span>
       <div className="min-w-0 flex-1 space-y-3">
         <div className="rounded-2xl rounded-tl-md border bg-card px-4 py-3 text-sm leading-relaxed text-foreground shadow-sm">
-          <RichText content={content} citedIndexes={citedIndexes} />
+          <RichText content={content} citedIndexes={citedIndexes} streaming={streaming} />
         </div>
 
         {citations.length > 0 && (
@@ -127,7 +141,7 @@ export function MessageBubble({
           </div>
         )}
 
-        {messageId && (
+        {messageId && !streaming && (
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs text-muted-foreground">
               Was this helpful?

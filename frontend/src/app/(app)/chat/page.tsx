@@ -9,20 +9,12 @@ import { EmptyChat } from '@/components/chat/empty-chat';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useConversation } from '@/hooks/use-conversations';
-import { useSendMessage } from '@/hooks/use-chat';
+import { useChatStream } from '@/hooks/use-chat';
 import { useToast } from '@/hooks/use-toast';
 import { usePersistentBoolean } from '@/hooks/use-persistent-boolean';
-import { ChatQueryResponse, Message, MessageRole } from '@/lib/types';
-import { extractError } from '@/lib/utils';
-
-interface Optimistic {
-  query: string;
-  response: ChatQueryResponse | null;
-}
 
 export default function ChatPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [optimistic, setOptimistic] = useState<Optimistic | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Conversation history rail collapses on desktop; expanded by default.
   const [historyCollapsed, setHistoryCollapsed] = usePersistentBoolean(
@@ -31,7 +23,7 @@ export default function ChatPage() {
   );
 
   const conversation = useConversation(activeId);
-  const send = useSendMessage();
+  const { turn, displayText, isStreaming, send, reset } = useChatStream();
   const { error: toastError } = useToast();
 
   const serverMessages = useMemo(
@@ -39,87 +31,52 @@ export default function ChatPage() {
     [conversation.data],
   );
 
-  // Once the server history includes the just-sent answer, drop the optimistic
-  // pair so we don't render it twice.
+  // Once the streamed answer is persisted and shows up in server history, drop
+  // the live turn so we don't render it twice.
+  const turnPersisted =
+    Boolean(turn?.messageId) &&
+    serverMessages.some((m) => m.id === turn!.messageId);
+
   useEffect(() => {
-    if (
-      optimistic?.response &&
-      serverMessages.some((m) => m.id === optimistic.response!.message_id)
-    ) {
-      setOptimistic(null);
-    }
-  }, [serverMessages, optimistic]);
+    if (turnPersisted) reset();
+  }, [turnPersisted, reset]);
 
-  // Compose what to render: server history plus any not-yet-persisted turn.
-  const { messages, isSending } = useMemo(() => {
-    const list: Message[] = [...serverMessages];
-    let sending = false;
-
-    if (optimistic) {
-      const persisted =
-        optimistic.response &&
-        serverMessages.some((m) => m.id === optimistic.response!.message_id);
-
-      if (!persisted) {
-        list.push({
-          id: 'optimistic-user',
-          conversation_id: activeId ?? 'pending',
-          role: MessageRole.USER,
-          content: optimistic.query,
-          citations: null,
-          created_at: '',
-        });
-
-        if (optimistic.response) {
-          list.push({
-            id: optimistic.response.message_id,
-            conversation_id: optimistic.response.conversation_id,
-            role: MessageRole.ASSISTANT,
-            content: optimistic.response.answer,
-            citations: { items: optimistic.response.citations },
-            created_at: '',
-          });
-        } else {
-          sending = true;
-        }
-      }
-    }
-
-    return { messages: list, isSending: sending };
-  }, [serverMessages, optimistic, activeId]);
+  // The live turn is shown until its assistant message lands in server history.
+  const showLiveTurn = Boolean(turn) && !turnPersisted;
+  const pendingQuery = showLiveTurn ? turn!.query : null;
+  const streamingAnswer =
+    showLiveTurn && displayText
+      ? { text: displayText, citations: turn!.citations }
+      : null;
+  // Waiting for the first token: show the typing indicator, not an empty bubble.
+  const isSending = showLiveTurn && !displayText;
 
   const handleSend = (query: string, academicTerm: string | null) => {
-    setOptimistic({ query, response: null });
-    send.mutate(
+    send(
       { conversation_id: activeId, query, academic_term: academicTerm },
       {
-        onSuccess: (data) => {
-          if (!activeId) setActiveId(data.conversation_id);
-          setOptimistic({ query, response: data });
-        },
-        onError: (err) => {
-          setOptimistic(null);
-          toastError('Message failed', extractError(err, 'Please try again.'));
-        },
+        onConversation: (id) => setActiveId(id),
+        onError: (message) => toastError('Message failed', message),
       },
     );
   };
 
   const handleSelect = (id: string) => {
     setActiveId(id);
-    setOptimistic(null);
+    reset();
     setDrawerOpen(false);
   };
 
   const handleNew = () => {
     setActiveId(null);
-    setOptimistic(null);
+    reset();
     setDrawerOpen(false);
   };
 
   const loadingHistory =
-    Boolean(activeId) && conversation.isLoading && messages.length === 0;
-  const showEmpty = !loadingHistory && messages.length === 0 && !isSending;
+    Boolean(activeId) && conversation.isLoading && serverMessages.length === 0;
+  const hasContent = serverMessages.length > 0 || showLiveTurn;
+  const showEmpty = !loadingHistory && !hasContent;
 
   return (
     <div className="flex h-full">
@@ -195,14 +152,16 @@ export default function ChatPage() {
             </div>
           ) : (
             <MessageList
-              messages={messages}
+              messages={serverMessages}
               conversationId={activeId}
+              pendingQuery={pendingQuery}
+              streamingAnswer={streamingAnswer}
               isSending={isSending}
             />
           )}
         </div>
 
-        <ChatComposer onSend={handleSend} disabled={send.isPending} />
+        <ChatComposer onSend={handleSend} disabled={isStreaming} />
       </div>
     </div>
   );

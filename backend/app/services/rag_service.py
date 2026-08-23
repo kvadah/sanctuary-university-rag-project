@@ -2,11 +2,15 @@
 
 Retrieval is hybrid (dense + BM25 fused with RRF) with optional LLM query
 rewriting and reranking; generation is grounded in the retrieved chunks and
-carries recent conversation turns for multi-turn memory.
+carries recent conversation turns for multi-turn memory. Two entry points share
+the same retrieval/persistence path: ``answer_query`` returns a full response,
+while ``prepare_stream`` + ``stream_answer`` stream the generation as SSE events.
 """
+import logging
 import time
 import uuid
-from typing import Any, Dict, List, Tuple
+from dataclasses import dataclass
+from typing import Any, AsyncIterator, Dict, List, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +26,25 @@ from app.repositories.chat_repository import (
 from app.retrieval.retriever import Retriever
 from app.schemas.chat import ChatQueryRequest, ChatQueryResponse, Citation
 
+logger = logging.getLogger(__name__)
+
 _SNIPPET_CHARS = 240
+
+
+@dataclass
+class QueryPrep:
+    """Everything needed to generate an answer, gathered before generation.
+
+    Produced by :meth:`RagService._prepare` and reused by both the full-response
+    and streaming paths. Building this can raise a normal ``HTTPException`` (e.g.
+    404), so a streaming endpoint should call it *before* opening the SSE stream.
+    """
+
+    conversation: Any
+    history: List[Tuple[str, str]]
+    context_chunks: List[Dict[str, Any]]
+    citations: List[Citation]
+    started: float
 
 
 class RagService:
@@ -35,6 +57,75 @@ class RagService:
     async def answer_query(
         self, request: ChatQueryRequest, user: User
     ) -> ChatQueryResponse:
+        prep = await self._prepare(request, user)
+        generated = await self.generator.generate(
+            request.query, prep.context_chunks, history=prep.history
+        )
+        answer = generated["answer"]
+        meta = self._build_meta(prep, generated.get("usage"))
+        assistant_message = await self._persist_assistant(prep, answer, meta)
+
+        return ChatQueryResponse(
+            conversation_id=prep.conversation.id,
+            message_id=assistant_message.id,
+            answer=answer,
+            citations=prep.citations,
+            meta=meta,
+        )
+
+    async def prepare_stream(
+        self, request: ChatQueryRequest, user: User
+    ) -> QueryPrep:
+        """Resolve/persist/retrieve before streaming so failures return a clean
+        HTTP status (with CORS headers) rather than a broken event stream."""
+        return await self._prepare(request, user)
+
+    async def stream_answer(
+        self, prep: QueryPrep, request: ChatQueryRequest
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Stream the answer for an already-prepared query as event dicts.
+
+        Emits ``meta`` (conversation id + citations) first, then a ``delta`` per
+        text chunk, then ``done`` (persisted message id + telemetry). A failure
+        mid-generation becomes an ``error`` event — the HTTP response has already
+        started, so it cannot change status.
+        """
+        yield {
+            "type": "meta",
+            "conversation_id": str(prep.conversation.id),
+            "citations": [c.model_dump(mode="json") for c in prep.citations],
+        }
+
+        parts: List[str] = []
+        usage: Dict[str, Any] = {}
+        try:
+            async for ev in self.generator.generate_stream(
+                request.query, prep.context_chunks, history=prep.history
+            ):
+                if "delta" in ev:
+                    parts.append(ev["delta"])
+                    yield {"type": "delta", "text": ev["delta"]}
+                elif "usage" in ev:
+                    usage = ev["usage"] or {}
+
+            answer = "".join(parts)
+            meta = self._build_meta(prep, usage)
+            assistant_message = await self._persist_assistant(prep, answer, meta)
+            yield {
+                "type": "done",
+                "message_id": str(assistant_message.id),
+                "meta": meta,
+            }
+        except Exception:  # noqa: BLE001 - surface to the client as a stream event
+            logger.exception("Streaming generation failed")
+            yield {
+                "type": "error",
+                "detail": "Failed to generate a response. Please try again.",
+            }
+
+    async def _prepare(
+        self, request: ChatQueryRequest, user: User
+    ) -> QueryPrep:
         conversation = await self._resolve_conversation(request, user)
 
         # Load prior turns BEFORE persisting the current question, so history
@@ -79,36 +170,39 @@ class RagService:
                 )
             )
 
-        generated = await self.generator.generate(
-            request.query, context_chunks, history=history
+        return QueryPrep(
+            conversation=conversation,
+            history=history,
+            context_chunks=context_chunks,
+            citations=citations,
+            started=started,
         )
-        answer = generated["answer"]
-        latency_ms = int((time.perf_counter() - started) * 1000)
-        meta: Dict[str, Any] = {
+
+    def _build_meta(
+        self, prep: QueryPrep, usage: Dict[str, Any] | None
+    ) -> Dict[str, Any]:
+        return {
             "model": settings.DEFAULT_LLM_MODEL,
-            "latency_ms": latency_ms,
-            "retrieved_count": len(hits),
+            "latency_ms": int((time.perf_counter() - prep.started) * 1000),
+            "retrieved_count": len(prep.context_chunks),
             "retrieval_mode": "hybrid",
             "rerank_enabled": settings.RAG_RERANK_ENABLED,
-            "query_rewritten": bool(settings.RAG_QUERY_REWRITE_ENABLED and history),
-            **(generated.get("usage") or {}),
+            "query_rewritten": bool(
+                settings.RAG_QUERY_REWRITE_ENABLED and prep.history
+            ),
+            **(usage or {}),
         }
 
-        citation_payload = [c.model_dump(mode="json") for c in citations]
-        assistant_message = await self.messages.create(
-            conversation_id=conversation.id,
+    async def _persist_assistant(
+        self, prep: QueryPrep, answer: str, meta: Dict[str, Any]
+    ):
+        citation_payload = [c.model_dump(mode="json") for c in prep.citations]
+        return await self.messages.create(
+            conversation_id=prep.conversation.id,
             role=MessageRole.ASSISTANT,
             content=answer,
             citations={"items": citation_payload} if citation_payload else None,
             meta_data=meta,
-        )
-
-        return ChatQueryResponse(
-            conversation_id=conversation.id,
-            message_id=assistant_message.id,
-            answer=answer,
-            citations=citations,
-            meta=meta,
         )
 
     async def _resolve_conversation(self, request: ChatQueryRequest, user: User):
