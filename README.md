@@ -44,10 +44,6 @@ the identical question and correctly receive different answers.
 
 ## 📸 Screenshots
 
-> 📌 **These are placeholders.** Save real captures into
-> [`docs/screenshots/`](docs/screenshots) using the filenames listed there and they'll
-> appear here automatically.
-
 <div align="center">
 
 ![Landing page](docs/screenshots/landing.png)
@@ -57,8 +53,8 @@ the identical question and correctly receive different answers.
 
 |  |  |
 | :---: | :---: |
-| ![Chat with citations](docs/screenshots/chat.png)<br/>*Streaming, citation-backed answers* | ![Documents](docs/screenshots/documents.png)<br/>*Document upload & indexing* |
-| ![Admin — knowledge sources](docs/screenshots/admin-knowledge-sources.png)<br/>*Admin: knowledge-source management* | *(dark mode supported throughout)* |
+| ![Chat](docs/screenshots/chat.png)<br/>*Conversational chat interface* | ![Cited answer](docs/screenshots/response.png)<br/>*Grounded answer with inline `[n]` citations* |
+| ![Document upload](docs/screenshots/documents.png)<br/>*Document upload & indexing* | ![Admin overview](docs/screenshots/admin-overview.png)<br/>*Admin overview dashboard* |
 
 ---
 

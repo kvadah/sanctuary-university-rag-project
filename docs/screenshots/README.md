@@ -1,17 +1,13 @@
 # Screenshots
 
-Drop UI captures here and the main `README.md` will render them. Replace each
-placeholder by saving a PNG with the **exact filename** below (the README already
-points at these paths).
+UI captures rendered in the main [`README.md`](../../README.md).
 
-| Filename | What to capture | Suggested size |
-| --- | --- | --- |
-| `landing.png` | The public landing page (hero) | 1600×900 |
-| `chat.png` | A chat answer with inline `[1]` citations + sources panel | 1600×900 |
-| `documents.png` | The Documents page / upload dialog | 1600×900 |
-| `admin-knowledge-sources.png` | Admin → Knowledge Sources management | 1600×900 |
+| File | Shows |
+| --- | --- |
+| `landing.png` | Public landing page |
+| `chat.png` | Chat interface |
+| `response.png` | A grounded answer with inline `[n]` citations |
+| `documents.png` | Document upload & indexing page |
+| `admin-overview.png` | Admin overview dashboard |
 
-Tips:
-- Capture in both light and dark themes if you want a side-by-side later.
-- Keep widths consistent (~1600px) so the README gallery stays uniform.
-- Optimize PNGs (e.g. `pngquant`/`oxipng`) to keep the repo lean.
+To refresh one, overwrite the file in place (keep the same name) so the README picks it up automatically.
