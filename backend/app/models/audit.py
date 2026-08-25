@@ -46,3 +46,13 @@ class IndexingJob(BaseModel):
     total_documents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     processed_documents: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Populated when the job completes so a job links to the document it produced
+    # and reads well in the admin list without a second lookup.
+    document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

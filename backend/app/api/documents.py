@@ -1,5 +1,6 @@
 """Document ingestion endpoints."""
 import math
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -11,12 +12,12 @@ from app.models.knowledge import DocumentClassification
 from app.models.user import User, UserRole
 from app.schemas.common import PaginationMeta
 from app.schemas.knowledge import (
-    DocumentIngestResponse,
     DocumentListResponse,
-    DocumentRead,
+    IndexingJobListResponse,
+    IndexingJobRead,
 )
 from app.services.document_service import DocumentService
-from app.services.ingestion_service import IngestionService
+from app.services.ingestion_job_service import IngestionJobService
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -29,8 +30,8 @@ ReadRoles = require_roles(
 
 @router.post(
     "/upload",
-    response_model=DocumentIngestResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_model=IndexingJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def upload_document(
     file: UploadFile = File(...),
@@ -40,17 +41,41 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(UploadRoles),
 ):
-    """Upload and index a PDF/DOCX/TXT document (parse -> chunk -> embed -> store)."""
-    service = IngestionService(db)
-    document, chunk_count = await service.ingest_upload(
+    """Archive the upload and enqueue background indexing; returns the queued job."""
+    service = IngestionJobService(db)
+    job = await service.enqueue_upload(
         file=file,
         title=title,
         classification=classification,
         academic_term=academic_term,
     )
-    return DocumentIngestResponse(
-        document=DocumentRead.model_validate(document), chunk_count=chunk_count
+    return IndexingJobRead.model_validate(job)
+
+
+@router.get("/jobs", response_model=IndexingJobListResponse)
+async def list_indexing_jobs(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(UploadRoles),
+):
+    """Recent indexing jobs, newest first (polled while any are in flight)."""
+    service = IngestionJobService(db)
+    jobs = await service.list_recent(limit=limit)
+    return IndexingJobListResponse(
+        items=[IndexingJobRead.model_validate(j) for j in jobs]
     )
+
+
+@router.get("/jobs/{job_id}", response_model=IndexingJobRead)
+async def get_indexing_job(
+    job_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(UploadRoles),
+):
+    """Fetch a single indexing job by id (404 if it does not exist)."""
+    service = IngestionJobService(db)
+    job = await service.get_or_404(job_id)
+    return IndexingJobRead.model_validate(job)
 
 
 @router.get("", response_model=DocumentListResponse)

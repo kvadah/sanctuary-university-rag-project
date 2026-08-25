@@ -3,14 +3,15 @@
 import { FileText, Library, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { RoleGuard } from '@/components/layout/role-guard';
 import { ClassificationBadge } from '@/components/documents/classification-badge';
+import { IndexingStatusBadge } from '@/components/documents/indexing-status-badge';
 import { SyncStatusBadge } from '@/components/knowledge/sync-status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDocuments } from '@/hooks/use-documents';
+import { useDocuments, useIndexingJobs } from '@/hooks/use-documents';
 import { useKnowledgeSources } from '@/hooks/use-knowledge-sources';
 import { CLASSIFICATION_OPTIONS } from '@/lib/constants';
-import { DocumentClassification, SyncStatus, UserRole } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { DocumentClassification, IndexingStatus, SyncStatus, UserRole } from '@/lib/types';
+import { cn, formatRelative } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
 
 interface TileProps {
@@ -52,11 +53,13 @@ function AdminOverviewInner() {
   // typical installations; totals themselves come from the paginator.
   const docs = useDocuments(1, 100);
   const sources = useKnowledgeSources(1, 100);
+  const jobs = useIndexingJobs(true);
 
   const loading = docs.isLoading || sources.isLoading;
 
   const docItems = docs.data?.items ?? [];
   const sourceItems = sources.data?.items ?? [];
+  const jobItems = jobs.data ?? [];
   const totalDocs = docs.data?.pagination.total_items ?? 0;
   const totalSources = sources.data?.pagination.total_items ?? 0;
   const activeSources = sourceItems.filter((s) => s.is_active).length;
@@ -208,6 +211,48 @@ function AdminOverviewInner() {
                     <span className="text-sm font-medium tabular-nums text-foreground">
                       {row.count}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent indexing jobs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {jobItems.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No indexing jobs yet. Uploaded documents appear here as they’re
+                processed.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {jobItems.slice(0, 8).map((job) => (
+                  <li
+                    key={job.id}
+                    className="flex items-center justify-between gap-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {job.original_filename ?? 'Untitled upload'}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {job.status === IndexingStatus.COMPLETED
+                          ? `${job.chunk_count} chunk${
+                              job.chunk_count === 1 ? '' : 's'
+                            } · ${formatRelative(job.created_at)}`
+                          : job.status === IndexingStatus.FAILED &&
+                              job.error_message
+                            ? job.error_message
+                            : formatRelative(job.created_at)}
+                      </p>
+                    </div>
+                    <IndexingStatusBadge status={job.status} />
                   </li>
                 ))}
               </ul>

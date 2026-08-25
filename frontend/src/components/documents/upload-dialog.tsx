@@ -69,12 +69,10 @@ export function UploadDialog({ open, onClose, role }: UploadDialogProps) {
         academic_term: term || undefined,
       },
       {
-        onSuccess: (res) => {
+        onSuccess: (job) => {
           success(
-            'Document indexed',
-            `“${res.document.title}” · ${res.chunk_count} chunk${
-              res.chunk_count === 1 ? '' : 's'
-            } embedded.`,
+            'Indexing started',
+            `“${job.original_filename ?? file.name}” will appear in the list once processing finishes.`,
           );
           reset();
           onClose();

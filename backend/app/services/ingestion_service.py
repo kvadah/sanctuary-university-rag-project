@@ -1,12 +1,14 @@
-"""Ingestion pipeline: upload -> parse -> chunk -> embed -> Qdrant + Postgres.
+"""Ingestion pipeline: parse -> chunk -> embed -> Qdrant + Postgres.
 
-Runs synchronously within the request (no Celery yet). Parsing is CPU-bound and
-is executed in a threadpool so it does not block the event loop.
+The request no longer runs this inline; it archives the upload and enqueues a
+Celery job (see ``ingestion_job_service`` + ``app.workers.tasks``). The worker
+calls :meth:`IngestionService.ingest_bytes` on its persistent event loop. Parsing
+is CPU-bound and runs in a threadpool so it never blocks whichever loop drives it.
 """
 import uuid
 from typing import Optional, Tuple
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
@@ -35,6 +37,31 @@ _EXT_TO_SOURCE_TYPE = {
 }
 
 
+def resolve_file_type(filename: Optional[str]) -> str:
+    """Map a filename to a supported ingest type, or raise ``HTTPException`` 400.
+
+    Module-level so the request side can validate (and reject) an upload before a
+    job is ever created, and the worker can re-resolve from the stored filename.
+    """
+    if not filename or "." not in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot determine file type from filename.",
+        )
+    ext = filename.rsplit(".", 1)[1].lower()
+    if ext not in _EXT_TO_SOURCE_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type '.{ext}'. Supported: pdf, docx, txt.",
+        )
+    return ext
+
+
+def source_type_for(file_type: str) -> KnowledgeSourceType:
+    """The KnowledgeSource type that groups uploads of ``file_type``."""
+    return _EXT_TO_SOURCE_TYPE[file_type]
+
+
 class IngestionService:
     def __init__(self, db: AsyncSession):
         self.sources = KnowledgeSourceRepository(db)
@@ -43,16 +70,23 @@ class IngestionService:
         self.embeddings = EmbeddingClient()
         self.store = QdrantVectorStore()
 
-    async def ingest_upload(
+    async def ingest_bytes(
         self,
         *,
-        file: UploadFile,
+        data: bytes,
+        file_type: str,
+        source_id: uuid.UUID,
         title: Optional[str],
+        filename: Optional[str],
         classification: DocumentClassification,
         academic_term: Optional[str],
+        file_path: Optional[str] = None,
     ) -> Tuple[Document, int]:
-        file_type = self._resolve_type(file.filename)
-        data = await file.read()
+        """Run the full pipeline on already-read bytes and a resolved source.
+
+        Returns the persisted :class:`Document` and its chunk count. ``file_path``
+        is the MinIO object key of the archived original, stored on the document.
+        """
         if not data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,15 +109,13 @@ class IngestionService:
                 detail="No extractable text found in the document.",
             )
 
-        source = await self.sources.get_or_create_upload_source(
-            _EXT_TO_SOURCE_TYPE[file_type]
-        )
         document = await self.documents.create(
-            source_id=source.id,
-            title=title or file.filename,
+            source_id=source_id,
+            title=title or filename,
             file_type=file_type,
             classification=classification,
             academic_term=academic_term,
+            file_path=file_path,
         )
 
         vectors = await self.embeddings.embed_texts(
@@ -128,17 +160,3 @@ class IngestionService:
         await self.store.ensure_collection()
         await self.store.upsert(points)
         return document, len(chunk_rows)
-
-    def _resolve_type(self, filename: Optional[str]) -> str:
-        if not filename or "." not in filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot determine file type from filename.",
-            )
-        ext = filename.rsplit(".", 1)[1].lower()
-        if ext not in _EXT_TO_SOURCE_TYPE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type '.{ext}'. Supported: pdf, docx, txt.",
-            )
-        return ext

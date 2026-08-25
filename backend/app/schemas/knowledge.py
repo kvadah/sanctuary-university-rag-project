@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, ConfigDict
+from app.models.audit import IndexingStatus
 from app.models.knowledge import KnowledgeSourceType, DocumentClassification, SyncStatus
 from app.schemas.common import PaginationMeta
 
@@ -76,3 +77,23 @@ class DocumentIngestResponse(BaseModel):
 class DocumentListResponse(BaseModel):
     items: List[DocumentRead]
     pagination: PaginationMeta
+
+
+class IndexingJobRead(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    status: IndexingStatus
+    total_documents: int
+    processed_documents: int
+    chunk_count: int
+    error_message: Optional[str] = None
+    original_filename: Optional[str] = None
+    document_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IndexingJobListResponse(BaseModel):
+    items: List[IndexingJobRead]

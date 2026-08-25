@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { useDocuments } from '@/hooks/use-documents';
+import { useDocuments, useIndexingJobs } from '@/hooks/use-documents';
 import { useAuthStore } from '@/stores/auth-store';
 import { UPLOAD_ROLES } from '@/lib/constants';
+import { IndexingStatus } from '@/lib/types';
 import { extractError } from '@/lib/utils';
 
 export default function DocumentsPage() {
@@ -20,8 +21,16 @@ export default function DocumentsPage() {
   const { data, isLoading, isError, error } = useDocuments(page);
 
   const canUpload = user ? UPLOAD_ROLES.includes(user.role) : false;
+  const { data: jobs } = useIndexingJobs(canUpload);
   const documents = data?.items ?? [];
   const totalPages = data?.pagination.total_pages ?? 1;
+
+  // Surface in-flight and recently-failed jobs as rows above the catalog, only on
+  // the first page (a completed job disappears once its document is listed).
+  const visibleJobs =
+    page === 1
+      ? (jobs ?? []).filter((j) => j.status !== IndexingStatus.COMPLETED)
+      : [];
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
@@ -56,7 +65,7 @@ export default function DocumentsPage() {
             title="Couldn’t load documents"
             description={extractError(error, 'Please try again shortly.')}
           />
-        ) : documents.length === 0 ? (
+        ) : documents.length === 0 && visibleJobs.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="No documents yet"
@@ -76,7 +85,7 @@ export default function DocumentsPage() {
           />
         ) : (
           <div className="space-y-4">
-            <DocumentTable documents={documents} />
+            <DocumentTable documents={documents} jobs={visibleJobs} />
             <Pagination
               page={page}
               totalPages={totalPages}
