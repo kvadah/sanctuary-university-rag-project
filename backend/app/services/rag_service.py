@@ -45,6 +45,7 @@ class QueryPrep:
     context_chunks: List[Dict[str, Any]]
     citations: List[Citation]
     started: float
+    timings: Dict[str, float]
 
 
 class RagService:
@@ -58,11 +59,18 @@ class RagService:
         self, request: ChatQueryRequest, user: User
     ) -> ChatQueryResponse:
         prep = await self._prepare(request, user)
+        gen_started = time.perf_counter()
         generated = await self.generator.generate(
             request.query, prep.context_chunks, history=prep.history
         )
+        prep.timings["generate_ms"] = (time.perf_counter() - gen_started) * 1000
         answer = generated["answer"]
         meta = self._build_meta(prep, generated.get("usage"))
+        logger.info(
+            "answer timing: total=%.0fms %s",
+            meta["latency_ms"],
+            _fmt_timings(prep.timings),
+        )
         assistant_message = await self._persist_assistant(prep, answer, meta)
 
         return ChatQueryResponse(
@@ -98,18 +106,30 @@ class RagService:
 
         parts: List[str] = []
         usage: Dict[str, Any] = {}
+        gen_started = time.perf_counter()
         try:
             async for ev in self.generator.generate_stream(
                 request.query, prep.context_chunks, history=prep.history
             ):
                 if "delta" in ev:
+                    if not parts:
+                        # Perceived stall = retrieval + generation up to first token.
+                        prep.timings["ttft_ms"] = (
+                            time.perf_counter() - prep.started
+                        ) * 1000
                     parts.append(ev["delta"])
                     yield {"type": "delta", "text": ev["delta"]}
                 elif "usage" in ev:
                     usage = ev["usage"] or {}
 
+            prep.timings["generate_ms"] = (time.perf_counter() - gen_started) * 1000
             answer = "".join(parts)
             meta = self._build_meta(prep, usage)
+            logger.info(
+                "stream timing: total=%.0fms %s",
+                meta["latency_ms"],
+                _fmt_timings(prep.timings),
+            )
             assistant_message = await self._persist_assistant(prep, answer, meta)
             yield {
                 "type": "done",
@@ -138,13 +158,16 @@ class RagService:
             content=request.query,
         )
 
+        timings: Dict[str, float] = {}
         started = time.perf_counter()
         hits = await self.retriever.retrieve(
             request.query,
             user,
             academic_term=request.academic_term,
             history=history,
+            timings=timings,
         )
+        timings["retrieve_ms"] = (time.perf_counter() - started) * 1000
 
         context_chunks: List[Dict[str, Any]] = []
         citations: List[Citation] = []
@@ -176,6 +199,7 @@ class RagService:
             context_chunks=context_chunks,
             citations=citations,
             started=started,
+            timings=timings,
         )
 
     def _build_meta(
@@ -190,6 +214,7 @@ class RagService:
             "query_rewritten": bool(
                 settings.RAG_QUERY_REWRITE_ENABLED and prep.history
             ),
+            "timings": {k: round(v, 1) for k, v in prep.timings.items()},
             **(usage or {}),
         }
 
@@ -233,3 +258,11 @@ class RagService:
 def _snippet(text: str) -> str:
     text = " ".join(text.split())
     return text if len(text) <= _SNIPPET_CHARS else text[:_SNIPPET_CHARS].rstrip() + "…"
+
+
+def _fmt_timings(timings: Dict[str, float]) -> str:
+    """Render a timings dict as a single 'stage=Nms stage=Nms' log string."""
+    return " ".join(
+        f"{k[:-3] if k.endswith('_ms') else k}={v:.0f}ms"
+        for k, v in timings.items()
+    )

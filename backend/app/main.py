@@ -1,7 +1,24 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api import api_router
+
+# Send application logs (incl. the RAG pipeline's `timing:` lines) to stdout.
+# Uvicorn configures only its own loggers and leaves the "app" package silent, so
+# attach a handler to it directly: INFO when DEBUG, WARNING otherwise. Child
+# loggers (app.services.*, app.retrieval.*) inherit this and stop propagating,
+# so lines appear once in `docker-compose logs -f backend`.
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    _app_logger.addHandler(_handler)
+_app_logger.setLevel(logging.INFO if settings.DEBUG else logging.WARNING)
+_app_logger.propagate = False
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
