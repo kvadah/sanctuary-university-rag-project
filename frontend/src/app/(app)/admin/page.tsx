@@ -1,6 +1,7 @@
 'use client';
 
 import { FileText, Library, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { StatTile } from '@/components/admin/stat-tile';
 import { RoleGuard } from '@/components/layout/role-guard';
 import { ClassificationBadge } from '@/components/documents/classification-badge';
 import { IndexingStatusBadge } from '@/components/documents/indexing-status-badge';
@@ -12,41 +13,6 @@ import { useKnowledgeSources } from '@/hooks/use-knowledge-sources';
 import { CLASSIFICATION_OPTIONS } from '@/lib/constants';
 import { DocumentClassification, IndexingStatus, SyncStatus, UserRole } from '@/lib/types';
 import { cn, formatRelative } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
-
-interface TileProps {
-  label: string;
-  value: number | string;
-  icon: LucideIcon;
-  accent: string;
-  hint?: string;
-}
-
-function StatTile({ label, value, icon: Icon, accent, hint }: TileProps) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-4 p-5">
-        <span
-          className={cn(
-            'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
-            accent,
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-            {value}
-          </p>
-          <p className="truncate text-sm text-muted-foreground">{label}</p>
-          {hint && (
-            <p className="truncate text-xs text-muted-foreground/80">{hint}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function AdminOverviewInner() {
   // Pull a generous page so counts/distributions reflect the whole catalog in
