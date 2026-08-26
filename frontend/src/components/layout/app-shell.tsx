@@ -42,7 +42,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onToggleNav={() => setNavCollapsed((c) => !c)}
           navCollapsed={navCollapsed}
         />
-        <main className="min-h-0 flex-1">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+          {children}
+        </main>
       </div>
     </div>
   );
