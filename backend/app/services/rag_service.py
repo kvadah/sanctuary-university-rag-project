@@ -157,6 +157,10 @@ class RagService:
             role=MessageRole.USER,
             content=request.query,
         )
+        # Mark the conversation as just-engaged so it sorts to the top of the
+        # sidebar. Done here in _prepare so a single call covers both the stream
+        # and non-stream entry points; commits with the request's transaction.
+        await self.conversations.touch(conversation.id)
 
         timings: Dict[str, float] = {}
         started = time.perf_counter()

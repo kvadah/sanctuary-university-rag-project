@@ -2,7 +2,7 @@
 import uuid
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,6 +33,20 @@ class ConversationRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def touch(self, conversation_id: uuid.UUID) -> None:
+        """Bump ``updated_at`` so the conversation sorts as most-recently engaged.
+
+        Adding a message only inserts a child row, which does not fire the parent's
+        ``onupdate``; this explicit update keeps the "recently active" ordering in
+        :meth:`list_by_user` accurate. Uses ``func.now()`` for server-side time,
+        matching how the column is otherwise set.
+        """
+        await self.db.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(updated_at=func.now())
+        )
 
     async def list_by_user(
         self, user_id: uuid.UUID, skip: int, limit: int
