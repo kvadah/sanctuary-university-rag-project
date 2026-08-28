@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
-from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, List, Any, Dict, Literal
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.chat import MessageRole
 from app.schemas.common import PaginationMeta
 
@@ -26,6 +26,27 @@ class Citation(BaseModel):
 class ChatQueryResponse(BaseModel):
     conversation_id: uuid.UUID
     message_id: uuid.UUID
+    answer: str
+    citations: List[Citation] = []
+    meta: Dict[str, Any] = {}
+
+
+class PublicChatTurn(BaseModel):
+    """One prior turn supplied by an anonymous client (no server-side history)."""
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class PublicChatQueryRequest(BaseModel):
+    """A guest question. Since nothing is persisted, the client sends its own
+    recent turns in ``history`` (capped server-side)."""
+    query: str = Field(min_length=1, max_length=4000)
+    academic_term: Optional[str] = None
+    history: Optional[List[PublicChatTurn]] = None
+
+
+class PublicChatQueryResponse(BaseModel):
+    """Guest answer — no conversation_id / message_id because nothing is stored."""
     answer: str
     citations: List[Citation] = []
     meta: Dict[str, Any] = {}

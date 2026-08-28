@@ -24,3 +24,15 @@ _POLICY: Dict[UserRole, List[DC]] = {
 def allowed_classifications(role: UserRole) -> List[DC]:
     """Return the document classifications a user with ``role`` may retrieve."""
     return list(_POLICY[role])
+
+
+# Anonymous (unauthenticated) visitors have no UserRole. They get an explicit,
+# deliberately-separate scope — PUBLIC plus STUDENT — so a future change to the
+# STUDENT *role* policy above cannot silently widen guest access. This is the
+# single source of truth for what an un-logged-in visitor may retrieve.
+_ANON_POLICY: List[DC] = [DC.PUBLIC, DC.STUDENT]
+
+
+def anonymous_classifications() -> List[DC]:
+    """Document classifications retrievable by an unauthenticated visitor."""
+    return list(_ANON_POLICY)

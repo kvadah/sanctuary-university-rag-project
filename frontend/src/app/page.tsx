@@ -39,7 +39,8 @@ export default function Home() {
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const authed = hasHydrated && Boolean(token);
-  const primaryHref = authed ? '/chat' : '/login';
+  // Guests go straight into the no-login chat; authed users into their own.
+  const primaryHref = authed ? '/chat' : '/ask';
 
   return (
     <div className="flex min-h-screen flex-col justify-between bg-background">
@@ -130,6 +131,27 @@ export default function Home() {
             </span>
           </div>
         </Link>
+
+        {/* No-login affordance for visitors */}
+        {!authed && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No account needed —{' '}
+            <Link
+              href="/ask"
+              className="font-medium text-primary underline-offset-2 hover:underline"
+            >
+              try it without an account
+            </Link>
+            , or{' '}
+            <Link
+              href="/login"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              sign in
+            </Link>{' '}
+            to save your chats.
+          </p>
+        )}
 
         {/* Pillars */}
         <div className="mt-20 grid w-full grid-cols-1 gap-6 text-left md:grid-cols-3">

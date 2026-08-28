@@ -94,6 +94,8 @@ interface MessageBubbleProps {
   conversationId?: string | null;
   /** When true, render a blinking caret and no feedback controls (live stream). */
   streaming?: boolean;
+  /** Gate the feedback controls off entirely (e.g. the guest chat). Default true. */
+  allowFeedback?: boolean;
 }
 
 export function MessageBubble({
@@ -103,6 +105,7 @@ export function MessageBubble({
   messageId,
   conversationId,
   streaming,
+  allowFeedback = true,
 }: MessageBubbleProps) {
   const isUser = role === MessageRole.USER;
 
@@ -141,7 +144,7 @@ export function MessageBubble({
           </div>
         )}
 
-        {messageId && !streaming && (
+        {messageId && !streaming && allowFeedback && (
           <div className="flex items-center gap-2 px-1">
             <span className="text-xs text-muted-foreground">
               Was this helpful?

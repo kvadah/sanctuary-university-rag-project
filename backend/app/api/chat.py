@@ -17,6 +17,8 @@ from app.schemas.chat import (
     ConversationRead,
     FeedbackCreate,
     FeedbackRead,
+    PublicChatQueryRequest,
+    PublicChatQueryResponse,
 )
 from app.schemas.common import PaginationMeta
 from app.services.chat_service import ChatService
@@ -89,6 +91,50 @@ async def query_stream(
             raise
         finally:
             await session.close()
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/public/query", response_model=PublicChatQueryResponse)
+async def public_query(
+    payload: PublicChatQueryRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Ask a question **without an account** (no auth).
+
+    Retrieval is hard-scoped to PUBLIC + STUDENT documents and **nothing is
+    persisted** — the client supplies any prior turns in ``history``.
+    """
+    service = RagService(db)
+    return await service.answer_public(payload)
+
+
+@router.post("/public/query/stream")
+async def public_query_stream(
+    payload: PublicChatQueryRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Streaming counterpart of ``/public/query`` (SSE). Unauthenticated,
+    PUBLIC + STUDENT scope, no persistence.
+
+    Unlike the authed stream, the public path never writes mid-stream: retrieval
+    finishes inside ``prepare_public_stream`` (while this request's session is
+    still open) and generation touches no DB, so the ordinary ``Depends(get_db)``
+    session is sufficient even though it closes before the body streams. Events
+    are ``data:`` lines of JSON typed ``meta`` | ``delta`` | ``done`` | ``error``;
+    the stream ends with ``data: [DONE]``.
+    """
+    service = RagService(db)
+    prep = await service.prepare_public_stream(payload)
+
+    async def events():
+        async for event in service.stream_public_answer(prep, payload):
+            yield f"data: {json.dumps(event)}\n\n"
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(
         events(),

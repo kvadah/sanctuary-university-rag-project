@@ -17,10 +17,8 @@ from app.core.config import settings
 from app.llm.embeddings import EmbeddingClient
 from app.llm.query_rewriter import QueryRewriter
 from app.models.knowledge import DocumentClassification
-from app.models.user import User
 from app.retrieval.bm25_index import bm25_index_cache
 from app.retrieval.fusion import reciprocal_rank_fusion
-from app.retrieval.rbac import allowed_classifications
 from app.retrieval.reranker import LLMReranker
 from app.retrieval.types import RetrievedChunk
 from app.retrieval.vector_store import QdrantVectorStore
@@ -43,20 +41,24 @@ class Retriever:
     async def retrieve(
         self,
         query: str,
-        user: User,
+        allowed: List[DocumentClassification],
         academic_term: Optional[str] = None,
         top_k: Optional[int] = None,
         history: Optional[List[Tuple[str, str]]] = None,
         timings: Optional[Dict[str, float]] = None,
     ) -> List[RetrievedChunk]:
-        """Return the fused, RBAC-filtered chunks most relevant to ``query``.
+        """Return the fused chunks most relevant to ``query``, restricted to the
+        ``allowed`` document classifications.
+
+        ``allowed`` is the caller's RBAC decision (a logged-in user's role policy,
+        or the fixed anonymous scope) — the retriever applies it uniformly to both
+        the dense and lexical passes rather than deriving it itself.
 
         When ``timings`` is provided, per-stage elapsed ms (rewrite/embed/qdrant/
         bm25/rerank) are recorded into it for latency profiling — passing it does
         not change what is retrieved.
         """
         top_k = top_k or settings.RAG_TOP_K
-        allowed = allowed_classifications(user.role)
 
         # Contextualise follow-ups into a standalone query before retrieving.
         retrieval_query = query

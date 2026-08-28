@@ -16,6 +16,8 @@ interface MessageListProps {
   streamingAnswer?: { text: string; citations: Citation[] } | null;
   /** Waiting for the first token — show the typing indicator. */
   isSending?: boolean;
+  /** Gate feedback controls off for every message (e.g. the guest chat). */
+  allowFeedback?: boolean;
 }
 
 export function MessageList({
@@ -24,6 +26,7 @@ export function MessageList({
   pendingQuery,
   streamingAnswer,
   isSending,
+  allowFeedback = true,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +44,7 @@ export function MessageList({
           citations={getCitations(m)}
           messageId={m.role === MessageRole.ASSISTANT ? m.id : undefined}
           conversationId={conversationId}
+          allowFeedback={allowFeedback}
         />
       ))}
 
