@@ -26,7 +26,7 @@ export function Topbar({ onMenuClick, onToggleNav, navCollapsed }: TopbarProps) 
   const title = currentTitle(pathname);
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card/80 px-4 backdrop-blur lg:px-6">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card px-4 lg:px-6">
       {/* Mobile: open the navigation drawer */}
       <button
         type="button"

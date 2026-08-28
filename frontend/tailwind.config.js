@@ -55,6 +55,11 @@ module.exports = {
         xl: '0.875rem',
         '2xl': '1.125rem',
       },
+      boxShadow: {
+        // Tight, ink-tinted card elevation — defines surfaces without the muddy
+        // soft-glow that reads as "blur" on a light background.
+        card: '0 1px 2px 0 rgb(15 23 42 / 0.06), 0 1px 3px 0 rgb(15 23 42 / 0.10)',
+      },
       keyframes: {
         'fade-in': {
           from: { opacity: '0' },

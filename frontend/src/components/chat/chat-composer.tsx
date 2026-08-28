@@ -39,7 +39,7 @@ export function ChatComposer({ onSend, disabled }: ChatComposerProps) {
   };
 
   return (
-    <div className="border-t bg-background/80 backdrop-blur">
+    <div className="border-t bg-background">
       <div className="mx-auto w-full max-w-3xl px-4 py-3">
         <div className="flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
           <textarea

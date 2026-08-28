@@ -11,9 +11,9 @@
     --popover: 255 255 255;
     --popover-foreground: 15 23 42;
     --muted: 241 245 249; /* slate-100 */
-    --muted-foreground: 100 116 139; /* slate-500 */
-    --border: 226 232 240; /* slate-200 */
-    --input: 226 232 240; /* slate-200 */
+    --muted-foreground: 71 85 105; /* slate-600 — crisper secondary text on the light canvas */
+    --border: 203 213 225; /* slate-300 — hairlines that actually read on white/slate-50 */
+    --input: 203 213 225; /* slate-300 */
     --ring: 2 132 199; /* sky-600 */
     --primary: 2 132 199; /* sky-600 */
     --primary-foreground: 255 255 255;
